@@ -5,6 +5,9 @@
     "lua/?.lua",
     "lua/?/init.lua"
   ],
+  "workspace.library": [
+    "/home/runner/work/graft-git.nvim/graft-git.nvim/deps/tlj/graft.nvim"
+  ],
   "diagnostics.globals": [
     "vim",
     "it",

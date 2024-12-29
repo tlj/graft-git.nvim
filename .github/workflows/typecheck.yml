@@ -20,7 +20,7 @@ jobs:
           repository: "tlj/graft.nvim"
           path: "deps/tlj/graft.nvim"
       - name: Type Check Code Base
-        uses: mrcjkb/lua-typecheck-action@v0.2.1
+        uses: mrcjkb/lua-typecheck-action@v1
         with:
           configpath: .github/workflows/.luarc.json
           directories: |

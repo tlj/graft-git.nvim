@@ -7,10 +7,15 @@ An extension to [graft.nvim](https://github.com/tlj/graft.nvim) to handle automa
 
 ## Installation
 
+See [graft.nvim](https://github.com/tlj/graft.nvim) for a simple `init.lua` method which can be used to ensure 
+both `graft.nvim` and other extensions like `graft-git.nvim` are automatically installed.
+
+Or you can follow the manual installation method below.
+
 Add graft-git.nvim as a git submodule in your Neovim configuration:
 
 ```bash
-:execute '!git -C ' .. stdpath('config') .. ' submodule add https://github.com/tlj/graft-git.nvim pack/vendor/start/graft-git.nvim'
+:execute '!git -C ' .. stdpath('config') .. ' submodule add https://github.com/tlj/graft-git.nvim pack/graft/start/graft-git.nvim'
 ```
 
 ## Usage

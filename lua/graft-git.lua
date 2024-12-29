@@ -45,7 +45,7 @@ M.pack_dir = function(spec)
 		packtype = "opt"
 	end
 
-	return "pack/vendor/" .. packtype .. "/" .. spec.dir
+	return "pack/graft/" .. packtype .. "/" .. spec.dir
 end
 
 ---@param spec graft.Spec
@@ -139,11 +139,11 @@ M.remove_submodule = function(spec)
 	return true
 end
 
--- Find all directories in pack/vendor
+-- Find all directories in pack/graft
 ---@param type string The type of pack to find (start or opt)
 ---@return table<string, table>
 M.find_in_pack_dir = function(type)
-	local pack_dir = M.root_dir() .. "/pack/vendor/"
+	local pack_dir = M.root_dir() .. "/pack/graft/"
 	if type == "now" then
 		pack_dir = pack_dir .. "start"
 	else

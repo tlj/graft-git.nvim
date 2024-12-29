@@ -12,8 +12,16 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v4
-      - uses: stevearc/nvim-typecheck-action@v2
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Install graft.nvim dependency
+        uses: actions/checkout@v3
+        with:
+          repository: "tlj/graft.nvim"
+          path: "deps/tlj/graft.nvim"
+      - name: Type Check Code Base
+        uses: mrcjkb/lua-typecheck-action@v1
         with:
           configpath: .github/workflows/.luarc.json
-          path: lua
+          directories: |
+            lua

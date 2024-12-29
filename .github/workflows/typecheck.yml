@@ -21,5 +21,5 @@ jobs:
           path: "deps/tlj/graft.nvim"
       - uses: stevearc/nvim-typecheck-action@v2
         with:
-          configpath: .github/workflows/.luarc.json
+          configpath: /home/runner/work/graft-git.nvim/graft-git.nvim/.github/workflows/.luarc.json
           path: lua

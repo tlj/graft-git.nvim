@@ -114,11 +114,6 @@ end
 ---@param spec graft.Spec
 ---@return boolean
 M.remove_submodule = function(spec)
-	if spec.dir == "graft.nvim" or spec.dir == "graft-git.nvim" then
-		show_status("Can not remove graft.nvim and graft-git.nvim.")
-		return false
-	end
-
 	show_status("Removing " .. spec.dir .. "...")
 
 	local cmds = {
@@ -235,6 +230,7 @@ end
 ---@param opts? graft.Git.Sync Configuration options
 M.setup = function(opts)
 	-- Register our hooks with graft
+	graft.register("tlj/graft-git.nvim", { type = "now" })
 	graft.register_hook("post_register", function(plugins) M.sync(plugins, opts) end)
 end
 

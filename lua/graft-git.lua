@@ -39,14 +39,7 @@ M.full_pack_dir = function(spec) return M.root_dir() .. "/" .. M.pack_dir(spec) 
 
 ---@param spec graft.Spec
 ---@return string
-M.pack_dir = function(spec)
-	local packtype = "start"
-	if spec.type == "later" then
-		packtype = "opt"
-	end
-
-	return "pack/graft/" .. packtype .. "/" .. spec.dir
-end
+M.pack_dir = function(spec) return "pack/graft/" .. spec.type .. "/" .. spec.dir end
 
 ---@param spec graft.Spec
 ---@return string
@@ -138,12 +131,7 @@ end
 ---@param type string The type of pack to find (start or opt)
 ---@return table<string, table>
 M.find_in_pack_dir = function(type)
-	local pack_dir = M.root_dir() .. "/pack/graft/"
-	if type == "now" then
-		pack_dir = pack_dir .. "start"
-	else
-		pack_dir = pack_dir .. "opt"
-	end
+	local pack_dir = M.root_dir() .. "/pack/graft/" .. type
 
 	local plugins_by_dir = {}
 
@@ -190,8 +178,8 @@ M.sync = function(plugins, opts)
 	end
 
 	if opts.remove_plugins then
-		local installed_start = M.find_in_pack_dir("now")
-		local installed_opt = M.find_in_pack_dir("later")
+		local installed_start = M.find_in_pack_dir("start")
+		local installed_opt = M.find_in_pack_dir("opt")
 
 		local installed = vim.tbl_extend("force", installed_start, installed_opt)
 
@@ -230,7 +218,7 @@ end
 ---@param opts? graft.Git.Sync Configuration options
 M.setup = function(opts)
 	-- Register our hooks with graft
-	graft.register("tlj/graft-git.nvim", { type = "now" })
+	graft.register("tlj/graft-git.nvim", { type = "start" })
 	graft.register_hook("post_register", function(plugins) M.sync(plugins, opts) end)
 end
 

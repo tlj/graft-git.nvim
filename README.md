@@ -29,7 +29,7 @@ require("graft-git").setup({ install_plugins = true, remove_plugins = true })
 
 -- The defined plugin will be automatically added as a submodule by graft-git.nvim
 require("graft").setup({ 
-  now = {
+  start = {
     "catppuccin/nvim", 
     { name = "catppuccin", setup = function() vim.cmd("colorscheme catppuccin-mocha") end } }
   },

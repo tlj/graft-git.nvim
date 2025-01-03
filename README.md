@@ -36,6 +36,13 @@ require("graft").setup({
 })
 ```
 
+The plugin adds the following commands:
+
+*:GraftInstall* Installs all plugins according to the `graft.nvim` setup definition.
+*:GraftRemove* Removes all plugins installed in `pack/graft` which are no longer in the `graft.nvim` setup.
+*:GraftUpdate* Update all currently defined plugins from git.
+*:GraftSync* Install, remove and update all plugins as defined in the `graft.nvim` setup.
+
 ## Healthcheck
 
 In the Neovim cmdline run:

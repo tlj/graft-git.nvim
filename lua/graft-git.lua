@@ -12,10 +12,8 @@ local graft = require("graft")
 -- Update status in neovim without user input
 ---@param msg string
 local function show_status(msg)
-	vim.schedule(function()
-		vim.cmd.redraw()
-		vim.cmd.echo("'" .. msg .. "'")
-	end)
+	vim.cmd.redraw()
+	vim.cmd.echo("'" .. msg .. "'")
 end
 
 ---@param spec graft.Spec
@@ -68,7 +66,11 @@ M.add_submodule = function(spec)
 		show_status("Adding " .. spec.repo .. " [ok]")
 	end
 
-	M.checkout_branch(spec)
+	if spec.tag then
+		M.checkout_tag(spec)
+	elseif spec.branch then
+		M.checkout_branch(spec)
+	end
 
 	return success
 end
@@ -76,19 +78,55 @@ end
 ---@param spec graft.Spec
 ---@return boolean
 M.checkout_branch = function(spec)
-	local branch = spec.tag or spec.branch
+	if not spec.branch then
+		return true
+	end
 
-	if branch then
-		M.run_git({ "git", "-C", M.full_pack_dir(spec), "fetch", "--all" })
+	-- set submodule to follow branch
+	M.run_git({
+		"git",
+		"-C",
+		M.root_dir(),
+		"config",
+		"-f",
+		".gitmodules",
+		"submodule." .. M.pack_dir(spec) .. ".branch",
+		spec.branch,
+	})
 
-		local checkout_cmd = { "git", "-C", M.full_pack_dir(spec), "checkout", branch }
-		local success, output = M.run_git(checkout_cmd)
-		if not success then
-			vim.print("Error checking out tag " .. branch .. " for repo " .. spec.repo .. ": " .. output)
-			vim.print(checkout_cmd)
-			show_status("Unable to checkout tag " .. branch .. " for repo " .. spec.repo .. ": " .. output)
-			return false
-		end
+	M.update_plugin(spec)
+
+	return true
+end
+
+-- Update a plugin
+---@param spec graft.Spec
+---@return boolean
+M.update_plugin = function(spec)
+	-- update the submodule
+	local checkout_cmd = { "git", "-C", M.root_dir(), "submodule", "update", "--remote", M.pack_dir(spec) }
+	local success, output = M.run_git(checkout_cmd)
+	if not success then
+		vim.print("Unable to update repo " .. spec.repo .. ": " .. output)
+		return false
+	end
+
+	return true
+end
+
+-- Set the submodule to follow a tag
+---@param spec graft.Spec
+---@return boolean
+M.checkout_tag = function(spec)
+	if not spec.tag then
+		return true
+	end
+
+	local checkout_cmd = { "git", "-C", M.full_pack_dir(spec), "checkout", spec.tag }
+	local success, output = M.run_git(checkout_cmd)
+	if not success then
+		vim.print("Error checking out tag " .. spec.tag .. " for repo " .. spec.repo .. ": " .. output)
+		return false
 	end
 
 	return true
@@ -193,25 +231,23 @@ M.sync = function(plugins, opts)
 	end
 
 	-- Install missing plugins
-	if opts.install_plugins then
-		for _, spec in pairs(plugins) do
-			if not M.is_installed(spec) then
-				M.add_submodule(spec)
+	for _, spec in pairs(plugins) do
+		if opts.install_plugins and not M.is_installed(spec) then
+			show_status("Installing " .. spec.repo .. "...")
+			M.add_submodule(spec)
+		elseif opts.update_plugins then
+			show_status("Updating " .. spec.repo .. "...")
+			if spec.tag then
+				M.checkout_tag(spec)
+			elseif spec.branch then
 				M.checkout_branch(spec)
+			else
+				M.update_plugin(spec)
 			end
 		end
 	end
 
-	if opts.update_plugins then
-		for _, spec in pairs(plugins) do
-			-- Ensure that the correct branch is followed
-			M.checkout_branch(spec)
-
-			-- Update submodule
-			show_status("Updating " .. spec.repo)
-			M.run_git({ "git", "-C", M.full_pack_dir(spec), "pull" })
-		end
-	end
+	show_status("Graft sync complete.")
 end
 
 ---Setup graft-git
@@ -220,6 +256,27 @@ M.setup = function(opts)
 	-- Register our hooks with graft
 	graft.register("tlj/graft-git.nvim", { type = "start" })
 	graft.register_hook("post_register", function(plugins) M.sync(plugins, opts) end)
+
+	vim.api.nvim_create_user_command(
+		"GraftInstall",
+		function() M.sync(graft.plugins, { install_plugins = true, remove_plugins = false, update_plugins = false }) end,
+		{}
+	)
+	vim.api.nvim_create_user_command(
+		"GraftRemove",
+		function() M.sync(graft.plugins, { install_plugins = false, remove_plugins = true, update_plugins = false }) end,
+		{}
+	)
+	vim.api.nvim_create_user_command(
+		"GraftUpdate",
+		function() M.sync(graft.plugins, { install_plugins = false, remove_plugins = false, update_plugins = true }) end,
+		{}
+	)
+	vim.api.nvim_create_user_command(
+		"GraftSync",
+		function() M.sync(graft.plugins, { install_plugins = true, remove_plugins = true, update_plugins = true }) end,
+		{}
+	)
 end
 
 return M

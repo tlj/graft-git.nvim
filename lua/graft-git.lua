@@ -46,30 +46,32 @@ M.git_url = function(spec) return "https://github.com/" .. spec.repo end
 ---@return string
 M.root_dir = function()
 	---@diagnostic disable-next-line: return-type-mismatch
-	return vim.fn.stdpath("config")
+	return vim.fn.stdpath("data") .. "/site/"
 end
 
 ---@param spec graft.Spec
 ---@return boolean
-M.add_submodule = function(spec)
-	show_status("Adding " .. spec.repo .. "...")
+M.install = function(spec)
+	show_status("Installing " .. spec.repo .. "...")
 
-	local cmd = { "git", "-C", M.root_dir(), "submodule", "add", "-f", M.git_url(spec), M.pack_dir(spec) }
+	local cmd = { "git", "clone", "--depth", "1" }
+
+	if spec.branch then
+		cmd = vim.list_extend(cmd, { "-b", spec.branch })
+	elseif spec.tag then
+		cmd = vim.list_extend(cmd, { "-b", spec.tag })
+	end
+
+	cmd = vim.list_extend(cmd, { M.git_url(spec), M.full_pack_dir(spec) })
 
 	local success, output = M.run_git(cmd)
 
 	if not success then
-		vim.notify("Failed to add submodule: " .. output, vim.log.levels.ERROR)
-		show_status("Adding " .. spec.repo .. " [failed]")
+		vim.notify("Failed to install: " .. output, vim.log.levels.ERROR)
+		show_status("Installing " .. spec.repo .. " [failed]")
 		return false
 	else
-		show_status("Adding " .. spec.repo .. " [ok]")
-	end
-
-	if spec.tag then
-		M.checkout_tag(spec)
-	elseif spec.branch then
-		M.checkout_branch(spec)
+		show_status("Installing " .. spec.repo .. " [ok]")
 	end
 
 	return success
@@ -77,26 +79,38 @@ end
 
 ---@param spec graft.Spec
 ---@return boolean
-M.checkout_branch = function(spec)
-	if not spec.branch then
-		return true
+M.uninstall = function(spec)
+	local path = M.full_pack_dir(spec)
+
+	-- validate the path
+	if not path or path == "" then
+		return false, "Invalid path"
 	end
 
-	-- set submodule to follow branch
-	M.run_git({
-		"git",
-		"-C",
-		M.root_dir(),
-		"config",
-		"-f",
-		".gitmodules",
-		"submodule." .. M.pack_dir(spec) .. ".branch",
-		spec.branch,
-	})
+	-- Ensure we have an absolute normalized path
+	path = vim.fn.fnamemodify(path, ":p")
 
-	M.update_plugin(spec)
+	-- Sanity check to prevent accidental root or home directory deletion
+	if path:match("^/+$") or path:match("^" .. vim.fn.expand("~") .. "/?$") then
+		return false, "Preventing deletion of root or home directory"
+	end
 
-	return true
+	-- First, try to remove the directory recursively
+	local success, err = pcall(function()
+		-- Use vim.fn.delete with 'rf' flag:
+		-- 'r' means recursive
+		-- 'f' means force (no error if file doesn't exist)
+		local delete_result = vim.fn.delete(path, "rf")
+
+		if delete_result ~= 0 then
+			vim.notify("Failed to remove plugin " .. path .. ". Error: " .. err, vim.log.levels.ERROR)
+			error("Failed to delete directory")
+		end
+	end)
+
+	show_status("Removing " .. spec.dir .. " [ok]")
+
+	return success
 end
 
 -- Update a plugin
@@ -114,24 +128,6 @@ M.update_plugin = function(spec)
 	return true
 end
 
--- Set the submodule to follow a tag
----@param spec graft.Spec
----@return boolean
-M.checkout_tag = function(spec)
-	if not spec.tag then
-		return true
-	end
-
-	local checkout_cmd = { "git", "-C", M.full_pack_dir(spec), "checkout", spec.tag }
-	local success, output = M.run_git(checkout_cmd)
-	if not success then
-		vim.print("Error checking out tag " .. spec.tag .. " for repo " .. spec.repo .. ": " .. output)
-		return false
-	end
-
-	return true
-end
-
 -- Run a git command and return a type of result and output
 ---@param cmd table
 ---@return boolean, string
@@ -140,29 +136,6 @@ M.run_git = function(cmd)
 	local success = vim.v.shell_error == 0
 
 	return success, output
-end
-
----@param spec graft.Spec
----@return boolean
-M.remove_submodule = function(spec)
-	show_status("Removing " .. spec.dir .. "...")
-
-	local cmds = {
-		{ "git", "-C", M.root_dir(), "submodule", "deinit", "-f", M.pack_dir(spec) },
-		{ "git", "-C", M.root_dir(), "rm", "-f", M.pack_dir(spec) },
-	}
-
-	for _, cmd in ipairs(cmds) do
-		local success, output = M.run_git(cmd)
-		if not success then
-			vim.notify("Failed to remove submodule: " .. output, vim.log.levels.ERROR)
-			return false
-		end
-	end
-
-	show_status("Removing " .. spec.dir .. " [ok]")
-
-	return true
 end
 
 -- Find all directories in pack/graft
@@ -224,8 +197,8 @@ M.sync = function(plugins, opts)
 		-- Remove plugins that aren't in the plugin_list
 		for installed_name, installed_data in pairs(installed) do
 			if not desired[installed_name] then
-				show_status("Removing " .. installed_data.name .. "...")
-				M.remove_submodule({ dir = installed_data.name, type = installed_data.type })
+				show_status("Removing " .. installed_data.name .. "..." .. " (" .. installed_data.type .. ")")
+				M.uninstall({ dir = installed_data.name, type = installed_data.type })
 			end
 		end
 	end
@@ -234,7 +207,7 @@ M.sync = function(plugins, opts)
 	for _, spec in pairs(plugins) do
 		if opts.install_plugins and not M.is_installed(spec) then
 			show_status("Installing " .. spec.repo .. "...")
-			M.add_submodule(spec)
+			M.install(spec)
 		elseif opts.update_plugins then
 			show_status("Updating " .. spec.repo .. "...")
 			if spec.tag then
@@ -247,7 +220,7 @@ M.sync = function(plugins, opts)
 		end
 	end
 
-	show_status("Graft sync complete.")
+	-- show_status("Graft sync complete.")
 end
 
 ---Setup graft-git

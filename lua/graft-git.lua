@@ -58,8 +58,6 @@ M.install = function(spec)
 
 	if spec.branch then
 		cmd = vim.list_extend(cmd, { "-b", spec.branch })
-	elseif spec.tag then
-		cmd = vim.list_extend(cmd, { "-b", spec.tag })
 	end
 
 	cmd = vim.list_extend(cmd, { M.git_url(spec), M.full_pack_dir(spec) })
@@ -113,16 +111,62 @@ M.uninstall = function(spec)
 	return success
 end
 
+---@param dir string
+---@return string|nil, string|nil
+M.get_git_default_branch = function(dir)
+	-- Path to the remote HEAD reference file
+	local head_ref_path = dir .. "/.git/refs/remotes/origin/HEAD"
+
+	-- Try to open the file
+	local file = io.open(head_ref_path, "r")
+	if not file then
+		return nil, "Could not open " .. head_ref_path
+	end
+
+	-- Read the contents
+	local content = file:read("*all")
+	file:close()
+
+	-- Extract the branch name using pattern matching
+	local branch_name = string.match(content, "ref: refs/remotes/origin/([%w_-]+)")
+
+	if branch_name then
+		return branch_name, nil
+	else
+		return nil, "Could not extract branch name from " .. head_ref_path
+	end
+end
+
 -- Update a plugin
 ---@param spec graft.Spec
 ---@return boolean
 M.update_plugin = function(spec)
-	-- update the submodule
-	local checkout_cmd = { "git", "-C", M.root_dir(), "submodule", "update", "--remote", M.pack_dir(spec) }
-	local success, output = M.run_git(checkout_cmd)
-	if not success then
-		vim.print("Unable to update repo " .. spec.repo .. ": " .. output)
-		return false
+	local branch = spec.branch
+	local error
+
+	if not branch then
+		branch, error = M.get_git_default_branch(M.full_pack_dir(spec))
+		if not branch then
+			vim.print("Unable to get default branch for repo " .. spec.repo .. ": " .. error)
+			return false
+		end
+	end
+
+	if branch then
+		M.run_git({ "git", "-C", M.full_pack_dir(spec), "fetch", "--depth", "1", "--tags", "origin" })
+		M.run_git({ "git", "-C", M.full_pack_dir(spec), "fetch", "--depth", "1", "origin" })
+		local checkout_cmd = { "git", "-C", M.full_pack_dir(spec), "checkout", branch }
+		local success, output = M.run_git(checkout_cmd)
+		if not success then
+			vim.print("Unable to checkout " .. branch .. " for repo " .. spec.repo .. ": " .. output)
+			return false
+		end
+		local update_cmd = { "git", "-C", M.full_pack_dir(spec), "pull", "--recurse-submodules", "--update-shallow" }
+		local update_success, update_output = M.run_git(update_cmd)
+		if not update_success then
+			vim.print("Unable to update repo " .. spec.repo .. ": " .. update_output)
+			return false
+		end
 	end
 
 	return true
@@ -210,13 +254,7 @@ M.sync = function(plugins, opts)
 			M.install(spec)
 		elseif opts.update_plugins then
 			show_status("Updating " .. spec.repo .. "...")
-			if spec.tag then
-				M.checkout_tag(spec)
-			elseif spec.branch then
-				M.checkout_branch(spec)
-			else
-				M.update_plugin(spec)
-			end
+			M.update_plugin(spec)
 		end
 	end
 

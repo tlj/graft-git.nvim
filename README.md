@@ -1,5 +1,8 @@
 # graft-git.nvim
 
+> [!WARNING]
+> This is now deprecated. graft-git.nvim has been included in core.
+
 ![tests](https://github.com/tlj/graft-git.nvim/actions/workflows/tests.yml/badge.svg)
 ![typecheck](https://github.com/tlj/graft-git.nvim/actions/workflows/typecheck.yml/badge.svg)
 
